@@ -1,6 +1,5 @@
 pipeline {
     agent any
-    
     environment {
         ACR_NAME = 'flaskdevopsacr'
         ACR_LOGIN_SERVER = 'flaskdevopsacr.azurecr.io'
@@ -9,20 +8,17 @@ pipeline {
         RESOURCE_GROUP = 'flask-devops-rg'
         AKS_CLUSTER = 'flask-devops-aks'
     }
-    
     stages {
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
-        
         stage('Build Docker Image') {
             steps {
                 sh "docker build -t ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG} ."
             }
         }
-        
         stage('Push to ACR') {
             steps {
                 withCredentials([usernamePassword(
@@ -35,7 +31,6 @@ pipeline {
                 }
             }
         }
-        
         stage('Deploy to AKS') {
             steps {
                 withCredentials([string(
@@ -52,7 +47,6 @@ pipeline {
             }
         }
     }
-    
     post {
         success {
             echo 'Pipeline completed successfully!'
@@ -65,27 +59,57 @@ pipeline {
 pipeline {
     agent any
     environment {
-        ACR_NAME = 'flaskdevopsacr.azurecr.io'
+        ACR_NAME = 'flaskdevopsacr'
+        ACR_LOGIN_SERVER = 'flaskdevopsacr.azurecr.io'
         IMAGE_NAME = 'flask-app'
+        IMAGE_TAG = "v${BUILD_NUMBER}"
         RESOURCE_GROUP = 'flask-devops-rg'
         AKS_CLUSTER = 'flask-devops-aks'
     }
     stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t $ACR_NAME/$IMAGE_NAME:$BUILD_NUMBER .'
+                sh "docker build -t ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG} ."
             }
         }
         stage('Push to ACR') {
             steps {
-                sh 'az acr login --name flaskdevopsacr'
-                sh 'docker push $ACR_NAME/$IMAGE_NAME:$BUILD_NUMBER'
+                withCredentials([usernamePassword(
+                    credentialsId: 'acr-credentials',
+                    usernameVariable: 'ACR_USER',
+                    passwordVariable: 'ACR_PASS'
+                )]) {
+                    sh "docker login ${ACR_LOGIN_SERVER} -u ${ACR_USER} -p ${ACR_PASS}"
+                    sh "docker push ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}"
+                }
             }
         }
         stage('Deploy to AKS') {
             steps {
-                sh 'az aks get-credentials --resource-group $RESOURCE_GROUP --name $AKS_CLUSTER --overwrite-existing'
-                sh 'kubectl set image deployment/flask-app flask-app=$ACR_NAME/$IMAGE_NAME:$BUILD_NUMBER'
+                withCredentials([string(
+                    credentialsId: 'kubeconfig',
+                    variable: 'KUBECONFIG_DATA'
+                )]) {
+                    sh '''
+                        echo $KUBECONFIG_DATA | base64 -d > /tmp/kubeconfig
+                        export KUBECONFIG=/tmp/kubeconfig
+                        kubectl set image deployment/flask-app flask-app=${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}
+                        kubectl rollout status deployment/flask-app
+                    '''
+                }
             }
+        }
+    }
+    post {
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed!'
         }
     }
