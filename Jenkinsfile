@@ -62,3 +62,30 @@ pipeline {
         }
     }
 }
+pipeline {
+    agent any
+    environment {
+        ACR_NAME = 'flaskdevopsacr.azurecr.io'
+        IMAGE_NAME = 'flask-app'
+        RESOURCE_GROUP = 'flask-devops-rg'
+        AKS_CLUSTER = 'flask-devops-aks'
+    }
+    stages {
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t $ACR_NAME/$IMAGE_NAME:$BUILD_NUMBER .'
+            }
+        }
+        stage('Push to ACR') {
+            steps {
+                sh 'az acr login --name flaskdevopsacr'
+                sh 'docker push $ACR_NAME/$IMAGE_NAME:$BUILD_NUMBER'
+            }
+        }
+        stage('Deploy to AKS') {
+            steps {
+                sh 'az aks get-credentials --resource-group $RESOURCE_GROUP --name $AKS_CLUSTER --overwrite-existing'
+                sh 'kubectl set image deployment/flask-app flask-app=$ACR_NAME/$IMAGE_NAME:$BUILD_NUMBER'
+            }
+        }
+    }
