@@ -1,18 +1,3 @@
-from flask import Flask
-
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return '<h1>Hello from Flask!</h1><p>CI/CD Pipeline is working!</p>'
-
-@app.route('/health')
-def health():
-    return {'status': 'healthy'}, 200
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
-
 from flask import Flask, render_template_string
 
 app = Flask(__name__)
@@ -58,7 +43,6 @@ HTML = """
             <span class="badge">Jenkins</span>
         </div>
     </header>
-
     <div class="section">
         <h2>Projects</h2>
         <div class="cards">
@@ -76,7 +60,6 @@ HTML = """
             </div>
         </div>
     </div>
-
     <div class="section">
         <h2>Pipeline Architecture</h2>
         <div class="pipeline">
@@ -96,15 +79,12 @@ HTML = """
             </div>
         </div>
     </div>
-
     <footer>
         <p>Deployed on Azure Kubernetes Service | Powered by Docker & Jenkins</p>
     </footer>
 </body>
 </html>
 """
-
-app = Flask(__name__)
 
 @app.route('/')
 def home():
@@ -115,3 +95,4 @@ def health():
     return {'status': 'healthy'}, 200
 
 if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
